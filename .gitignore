@@ -65,4 +65,4 @@ computer_vision/app/pipeline-test3
 
 # Generated DeepStream configs (contain credentials)
 computer_vision/config/config*.yml
-computer_vision/config/config_nvdsanalytics.txt
+computer_vision/config/config_nvdsanalytics*.txt

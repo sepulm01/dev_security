@@ -32,6 +32,7 @@ class DeviceAdmin(admin.ModelAdmin):
                 )
             },
         ),
+        ("GPS", {"fields": ("latitude", "longitude")}),
         ("Estado", {"fields": ("is_online", "discovered_at", "last_seen")}),
         ("Streams", {"fields": ("stream_uris",), "classes": ("collapse",)}),
     )

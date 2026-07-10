@@ -96,6 +96,11 @@ def get_active_preset_for_device(device):
                 best_dist = dist
                 best_match = preset_obj
 
+        if best_match is None:
+            fallback = device.analytics_presets.first()
+            if fallback:
+                return fallback
+
         return best_match
     except Exception as e:
         logger.warning(

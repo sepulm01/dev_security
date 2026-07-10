@@ -121,6 +121,11 @@ urlpatterns = [
         name="configure_snmp",
     ),
     path(
+        "api/devices/<int:device_id>/set-gps/",
+        views.set_gps,
+        name="set_gps",
+    ),
+    path(
         "devices/<int:device_id>/patrols/",
         views.patrol_list,
         name="patrol_list",

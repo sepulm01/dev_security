@@ -71,6 +71,17 @@
                                 style="max-width:70px">
                         </div>
                     </dd>
+                    <dt>GPS</dt>
+                    <dd>
+                        <div class="d-flex align-items-center gap-2">
+                            <input type="number" step="any" class="form-control form-control-sm" id="gpsLat"
+                                value="{{ device.latitude|default:'' }}" placeholder="Latitud"
+                                style="max-width:130px">
+                            <input type="number" step="any" class="form-control form-control-sm" id="gpsLon"
+                                value="{{ device.longitude|default:'' }}" placeholder="Longitud"
+                                style="max-width:130px">
+                        </div>
+                    </dd>
                 </dl>
             </div>
         </div>
@@ -566,6 +577,22 @@ function saveSnmpConfig() {
 document.getElementById('snmpEnabled').addEventListener('change', saveSnmpConfig);
 document.getElementById('snmpCommunity').addEventListener('change', saveSnmpConfig);
 document.getElementById('snmpPort').addEventListener('change', saveSnmpConfig);
+
+function saveGps() {
+    var lat = document.getElementById('gpsLat').value;
+    var lon = document.getElementById('gpsLon').value;
+    fetch('/api/devices/' + DEVICE_ID + '/set-gps/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            latitude: lat !== '' ? parseFloat(lat) : null,
+            longitude: lon !== '' ? parseFloat(lon) : null,
+        }),
+    });
+}
+
+document.getElementById('gpsLat').addEventListener('change', saveGps);
+document.getElementById('gpsLon').addEventListener('change', saveGps);
 
 renderCapabilities();
 loadProfiles();

@@ -164,10 +164,13 @@ def _serialize_nvdsanalytics(sections):
     return "\n".join(lines)
 
 
-def generate_nvdsanalytics_config(devices, config_dir):
+def generate_nvdsanalytics_config(devices, config_dir, output_filename=None):
     from django.apps import apps
 
     AnalyticsPreset = apps.get_model("devices", "AnalyticsPreset")
+
+    if output_filename is None:
+        output_filename = NVDSANALYTICS_CONFIG_FILE
 
     all_sections = {}
     stream_idx = 0
@@ -191,13 +194,15 @@ def generate_nvdsanalytics_config(devices, config_dir):
         stream_idx += 1
 
     content = _serialize_nvdsanalytics(all_sections)
-    output_path = os.path.join(config_dir, NVDSANALYTICS_CONFIG_FILE)
+    output_path = os.path.join(config_dir, output_filename)
     os.makedirs(config_dir, exist_ok=True)
     with open(output_path, "w") as f:
         f.write(content)
 
 
-def generate_config(devices, output_path, pipeline_id="main"):
+def generate_config(devices, output_path, pipeline_id="main", nvdsanalytics_filename=None):
+    if nvdsanalytics_filename is None:
+        nvdsanalytics_filename = NVDSANALYTICS_CONFIG_FILE
     uris = []
     for device in devices:
         if not device.stream_uris:
@@ -247,7 +252,7 @@ primary-gie:
 
 {sgie_sections}analytics:
   enable: 1
-  config-file: {NVDSANALYTICS_CONFIG_FILE}
+  config-file: {nvdsanalytics_filename}
 
 osd:
   process-mode: 0
@@ -277,10 +282,8 @@ def generate_all_configs(config_dir=None):
             os.environ.get("CONFIG_YML_PATH", "/opt/computer_vision/config/config.yml")
         )
 
-    all_analytics_devices = []
-
     for pipeline_id in PIPELINE_CONFIGS:
-        devices = list(
+        pipeline_devices = list(
             Device.objects.filter(
                 deepstream_pipeline=pipeline_id,
                 is_online=True,
@@ -288,7 +291,7 @@ def generate_all_configs(config_dir=None):
                 source_type="rtsp",
             ).exclude(stream_uris={})
         )
-        devices += list(
+        pipeline_devices += list(
             Device.objects.filter(
                 deepstream_pipeline=pipeline_id,
                 stream_uris__isnull=False,
@@ -296,12 +299,10 @@ def generate_all_configs(config_dir=None):
             ).exclude(stream_uris={})
         )
 
-        all_analytics_devices.extend(devices)
-
         pipeline_cfg = PIPELINE_CONFIGS[pipeline_id]
         max_per_instance = pipeline_cfg["max_devices_per_instance"]
         instances_needed = min(
-            max((len(devices) + max_per_instance - 1) // max_per_instance, 1),
+            max((len(pipeline_devices) + max_per_instance - 1) // max_per_instance, 1),
             MAX_INSTANCES,
         )
 
@@ -309,13 +310,19 @@ def generate_all_configs(config_dir=None):
             filename = get_pipeline_filename(pipeline_id, instance=n)
             output_path = os.path.join(config_dir, filename)
 
-            if n <= instances_needed and devices:
-                my_devices = devices[(n - 1) :: instances_needed]
-                generate_config(my_devices, output_path, pipeline_id)
+            if n <= instances_needed and pipeline_devices:
+                my_devices = pipeline_devices[(n - 1) :: instances_needed]
+                nv_filename = (
+                    f"{NVDSANALYTICS_CONFIG_FILE.replace('.txt', '')}_{n}.txt"
+                    if n > 1
+                    else NVDSANALYTICS_CONFIG_FILE
+                )
+                generate_config(my_devices, output_path, pipeline_id,
+                                nvdsanalytics_filename=nv_filename)
+                generate_nvdsanalytics_config(my_devices, config_dir,
+                                              output_filename=nv_filename)
             else:
                 write_empty_config(output_path, pipeline_id)
-
-    generate_nvdsanalytics_config(all_analytics_devices, config_dir)
 
 
 def write_empty_config(output_path, pipeline_id):

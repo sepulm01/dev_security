@@ -30,6 +30,6 @@ property:
   parse-bbox-func-name: NvDsInferParseBbox
 
 class-attrs-all:
-  pre-cluster-threshold: 0.25
+  pre-cluster-threshold: 0.5
   topk: 300
   nms-iou-threshold: 0.45

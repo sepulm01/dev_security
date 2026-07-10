@@ -677,20 +677,38 @@ def analytics_presets(request, device_id):
             ptz = PTZService(client)
             presets = ptz.get_presets(profile_token)
 
-            stored = {
-                ap.preset_token: ap.snapshot
-                for ap in AnalyticsPreset.objects.filter(device=device)
-            }
+            all_db = AnalyticsPreset.objects.filter(device=device)
+            stored = {ap.preset_token: ap for ap in all_db}
+
             result = [
                 {
                     "token": getattr(p, "token", "") or getattr(p, "_token", ""),
                     "name": getattr(p, "Name", "") or f"Preset {i + 1}",
-                    "snapshot": stored.get(
-                        getattr(p, "token", "") or getattr(p, "_token", ""), ""
+                    "snapshot": (
+                        stored[getattr(p, "token", "") or getattr(p, "_token", "")].snapshot
+                        if (getattr(p, "token", "") or getattr(p, "_token", "")) in stored
+                        else ""
                     ),
                 }
                 for i, p in enumerate(presets)
             ]
+
+            camera_tokens = {r["token"] for r in result}
+            for ap in all_db:
+                if ap.preset_token not in camera_tokens:
+                    result.append({
+                        "token": ap.preset_token,
+                        "name": ap.preset_name or ap.preset_token,
+                        "snapshot": ap.snapshot or "",
+                    })
+
+            if not result:
+                result.append({
+                    "token": "__fixed__",
+                    "name": "Cámara fija",
+                    "snapshot": "",
+                })
+
             return JsonResponse({"presets": result, "has_ptz": True})
         except Exception as e:
             return JsonResponse(
@@ -1012,6 +1030,19 @@ def configure_snmp(request, device_id):
         device.snmp_community = data.get("snmp_community", "public")
         device.snmp_port = data.get("snmp_port", 161)
         device.save(update_fields=["snmp_enabled", "snmp_community", "snmp_port"])
+        return JsonResponse({"ok": True})
+    return JsonResponse({"error": "POST required"}, status=405)
+
+
+@login_required
+@csrf_exempt
+def set_gps(request, device_id):
+    device = get_object_or_404(Device, id=device_id)
+    if request.method == "POST":
+        data = json.loads(request.body) if request.body else {}
+        device.latitude = data.get("latitude") if data.get("latitude") is not None else None
+        device.longitude = data.get("longitude") if data.get("longitude") is not None else None
+        device.save(update_fields=["latitude", "longitude"])
         return JsonResponse({"ok": True})
     return JsonResponse({"error": "POST required"}, status=405)
 
