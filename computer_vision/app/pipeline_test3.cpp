@@ -700,10 +700,17 @@ static gboolean bus_call(GstBus* bus, GstMessage* msg, gpointer data)
             gchar* debug = NULL;
             GError* error = NULL;
             gst_message_parse_error(msg, &error, &debug);
-            g_printerr("ERROR from %s: %s\n", GST_OBJECT_NAME(msg->src), error->message);
+            const gchar* src_name = GST_OBJECT_NAME(msg->src);
+            g_printerr("ERROR from %s: %s\n", src_name, error->message);
             if (debug) g_printerr("Details: %s\n", debug);
             g_free(debug);
             g_error_free(error);
+            // Allow source/RTSP errors to be non-fatal — rtspsrc auto-reconnects
+            if (g_str_has_prefix(src_name, "source-bin-") ||
+                g_str_has_prefix(src_name, "source")) {
+                g_printerr("(source error — pipeline continues, source will reconnect)\n");
+                break;
+            }
             g_main_loop_quit(loop);
             break;
         }
@@ -741,6 +748,18 @@ static void decodebin_child_added(GstChildProxy* child_proxy, GObject* object,
         g_signal_connect(G_OBJECT(object), "child-added",
                          G_CALLBACK(decodebin_child_added), user_data);
     }
+    // Configure rtspsrc for TCP transport + auto-reconnect
+    if (g_str_has_prefix(name, "source")) {
+        g_object_set(G_OBJECT(object),
+            "protocols", 4,            // 4 = TCP only (avoids UDP buffer issues)
+            "retry", 100,              // unlimited retries on disconnect
+            "timeout", 5000000,        // 5 seconds
+            "tcp-timeout", 5000000,    // 5 seconds
+            "latency", 200,            // 200ms jitter buffer
+            "drop-on-latency", FALSE,  // never drop frames
+            NULL);
+        g_print("  -> rtspsrc configured: TCP mode, auto-retry\n");
+    }
 }
 
 static GstElement* create_source_bin(guint index, gchar* uri)
@@ -752,7 +771,7 @@ static GstElement* create_source_bin(guint index, gchar* uri)
 
     if (!bin || !uri_decode_bin) return NULL;
 
-    g_object_set(G_OBJECT(uri_decode_bin), "uri", uri, NULL);
+    g_object_set(G_OBJECT(uri_decode_bin), "uri", uri, "use-buffering", FALSE, NULL);
     g_signal_connect(G_OBJECT(uri_decode_bin), "pad-added", G_CALLBACK(cb_newpad), bin);
     g_signal_connect(G_OBJECT(uri_decode_bin), "child-added",
                      G_CALLBACK(decodebin_child_added), bin);

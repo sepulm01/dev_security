@@ -13,10 +13,9 @@ property:
   net-scale-factor: 0.00392156862745098
   model-color-format: 0
   onnx-file: resnet34_peoplenet_int8.onnx
-  model-engine-file: resnet34_peoplenet_int8.onnx_b3_gpu0_fp32.engine
   labelfile-path: labels.txt
   int8-calib-file: resnet34_peoplenet_int8.txt
-  batch-size: 3
+  batch-size: 1
   network-mode: 0
   num-detected-classes: 3
   interval: 0
@@ -30,6 +29,6 @@ property:
   parse-bbox-func-name: NvDsInferParseBbox
 
 class-attrs-all:
-  pre-cluster-threshold: 0.5
+  pre-cluster-threshold: 0.25
   topk: 300
   nms-iou-threshold: 0.45

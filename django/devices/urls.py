@@ -126,6 +126,16 @@ urlpatterns = [
         name="set_gps",
     ),
     path(
+        "api/devices/<int:device_id>/update-name/",
+        views.update_name,
+        name="update_name",
+    ),
+    path(
+        "devices/<int:device_id>/thumbnail/",
+        views.device_thumbnail,
+        name="device_thumbnail",
+    ),
+    path(
         "devices/<int:device_id>/patrols/",
         views.patrol_list,
         name="patrol_list",

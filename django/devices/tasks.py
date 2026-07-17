@@ -12,8 +12,8 @@ logger = logging.getLogger(__name__)
 
 MAX_FAILURE_COUNT = 3
 FPS_MIN_THRESHOLD = 6
-FPS_ZERO_CYCLES = 12
-FPS_LOW_CYCLES = 18
+FPS_ZERO_CYCLES = 30  # 30 × 5s = 150s — enough for engine rebuild + stream connect
+FPS_LOW_CYCLES = 36   # 36 × 5s = 180s — give time for stable FPS
 OFFLINE_RESTART_SECONDS = 120
 
 
@@ -332,6 +332,9 @@ def refresh_device_streams(device_id):
         if default_uri:
             mtx.ensure_camera_streams(
                 device.id, [device.default_profile_token], [default_uri]
+            )
+            mtx.ensure_raw_paths(
+                device.id, device.default_profile_token, default_uri
             )
     except Exception as e:
         logger.warning(

@@ -26,7 +26,11 @@
             <div class="card-status-top bg-red"></div>
             {% endif %}
             <div class="card-body">
-                <div class="d-flex align-items-center mb-3">
+                <div class="mb-2" style="height:120px;overflow:hidden;border-radius:4px;background:#0f172a">
+                    <img src="{% url 'device_thumbnail' d.id %}" alt="{{ d.name }}" loading="lazy"
+                        style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'">
+                </div>
+                <div class="d-flex align-items-center mb-2">
                     <div class="subheader">{% if d.is_online %}En línea{% else %}Desconectado{% endif %}</div>
                     <div class="ms-auto">
                         {% if d.source_type == "file" %}
@@ -46,9 +50,15 @@
                 <div class="text-muted mb-3">
                     <small>{{ d.manufacturer }} {{ d.model }}</small>
                 </div>
-                {% if d.deepstream_pipeline %}
+                {% if d.has_active_analytics %}
                 <div class="mb-3">
-                    <span class="badge bg-green-lt">{{ d.get_deepstream_pipeline_display }}</span>
+                    <span class="badge bg-green">{{ d.get_deepstream_pipeline_display }}</span>
+                    <span class="badge bg-green-lt ms-1"><i class="ti ti-player-play-filled"></i> Activo</span>
+                </div>
+                {% elif d.deepstream_pipeline %}
+                <div class="mb-3">
+                    <span class="badge bg-secondary-lt">{{ d.get_deepstream_pipeline_display }}</span>
+                    <span class="badge bg-yellow-lt ms-1"><i class="ti ti-player-pause-filled"></i> Sin streams</span>
                 </div>
                 {% endif %}
                 <div class="d-flex gap-2">

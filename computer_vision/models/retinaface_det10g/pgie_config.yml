@@ -4,7 +4,6 @@ property:
   offsets: 127.5;127.5;127.5
   model-color-format: 0
   onnx-file: /opt/computer_vision/models/retinaface_det10g/det_10g_batched.onnx
-  model-engine-file: /opt/computer_vision/models/retinaface_det10g/det_10g_batched.engine
   labelfile-path: /opt/computer_vision/models/retinaface_det10g/labels.txt
   batch-size: 1
   network-mode: 0

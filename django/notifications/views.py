@@ -97,6 +97,7 @@ def rule_create(request):
             analytics_trigger=data.get("analytics_trigger", []),
             min_objects=data.get("min_objects", 0),
             cooldown_seconds=data.get("cooldown_seconds", 0),
+            min_confidence=data.get("min_confidence", 0.25),
             min_duration_seconds=data.get("min_duration_seconds", 0),
             is_active=data.get("is_active", True),
             message_template=data.get("message_template", ""),
@@ -141,6 +142,7 @@ def rule_edit(request, rule_id):
         rule.analytics_trigger = data.get("analytics_trigger", rule.analytics_trigger)
         rule.min_objects = data.get("min_objects", rule.min_objects)
         rule.cooldown_seconds = data.get("cooldown_seconds", rule.cooldown_seconds)
+        rule.min_confidence = data.get("min_confidence", rule.min_confidence)
         rule.min_duration_seconds = data.get("min_duration_seconds", rule.min_duration_seconds)
         rule.is_active = data.get("is_active", rule.is_active)
         rule.message_template = data.get("message_template", rule.message_template)

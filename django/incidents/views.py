@@ -171,10 +171,19 @@ def incident_dashboard(request):
             })
 
     all_devices = Device.objects.all()
+    online_with_streams = sum(
+        1 for d in all_devices
+        if d.is_online and bool(d.stream_uris and d.default_profile_token)
+    )
+    with_analytics = 0
+    for d in all_devices:
+        has_streams = bool(d.stream_uris and d.default_profile_token)
+        if d.is_online and has_streams and d.deepstream_pipeline and d.source_type == "rtsp":
+            with_analytics += 1
     kpis = {
         "total_cameras": all_devices.count(),
-        "online_cameras": all_devices.filter(is_online=True).count(),
-        "with_analytics": all_devices.exclude(deepstream_pipeline="").count(),
+        "online_cameras": online_with_streams,
+        "with_analytics": with_analytics,
         "active_incidents": active_incidents.count(),
     }
 

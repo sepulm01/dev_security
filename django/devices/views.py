@@ -26,6 +26,12 @@ logger = logging.getLogger(__name__)
 @login_required
 def dashboard(request):
     devices = Device.objects.all()
+    for d in devices:
+        has_streams = bool(d.stream_uris and d.default_profile_token)
+        d.has_active_analytics = bool(
+            d.is_online and has_streams and d.deepstream_pipeline
+            and d.source_type == "rtsp"
+        )
     return render(request, "devices/dashboard.html", {"devices": devices})
 
 
@@ -1045,6 +1051,72 @@ def set_gps(request, device_id):
         device.save(update_fields=["latitude", "longitude"])
         return JsonResponse({"ok": True})
     return JsonResponse({"error": "POST required"}, status=405)
+
+
+@login_required
+@csrf_exempt
+def update_name(request, device_id):
+    device = get_object_or_404(Device, id=device_id)
+    if request.method == "POST":
+        data = json.loads(request.body) if request.body else {}
+        name = data.get("name", "").strip()
+        if name:
+            device.name = name
+            device.save(update_fields=["name"])
+        return JsonResponse({"ok": True})
+    return JsonResponse({"error": "POST required"}, status=405)
+
+
+@login_required
+def device_thumbnail(request, device_id):
+    device = get_object_or_404(Device, id=device_id)
+
+    cache_key = f"thumb:{device_id}"
+    r_conn = None
+    try:
+        import redis as rd
+        from urllib.parse import urlparse
+        redis_url = os.environ.get("REDIS_URL", "redis://redis:6379/0")
+        parsed = urlparse(redis_url)
+        r_conn = rd.Redis(host=parsed.hostname or "localhost", port=parsed.port or 6379,
+                     db=parsed.path.lstrip("/") if parsed.path else 0,
+                     password=parsed.password or None, socket_connect_timeout=2)
+        cached = r_conn.get(cache_key)
+        if cached:
+            return HttpResponse(cached, content_type="image/jpeg")
+    except Exception:
+        pass
+
+    try:
+        from onvif_utils.client import OnvifClient
+        from onvif_utils.media import MediaService
+        client = OnvifClient(device.host, device.port, device.username, device.password)
+        media = MediaService(client)
+        token = device.default_profile_token
+        if not token and device.stream_uris:
+            token = next(iter(device.stream_uris.keys()))
+        snapshot_url = media.get_snapshot_url(token,
+            username=device.username, password=device.password)
+        if snapshot_url:
+            resp = requests.get(snapshot_url, timeout=5)
+            resp.raise_for_status()
+            data = resp.content
+            if r_conn:
+                try:
+                    r_conn.setex(cache_key, 60, data)
+                except Exception:
+                    pass
+            return HttpResponse(data, content_type="image/jpeg")
+    except Exception:
+        pass
+
+    placeholder = (
+        '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180" viewBox="0 0 320 180">'
+        '<rect fill="#1e293b" width="320" height="180"/>'
+        '<text fill="#64748b" x="160" y="96" text-anchor="middle" font-size="14" font-family="sans-serif">'
+        'Sin vista previa</text></svg>'
+    )
+    return HttpResponse(placeholder, content_type="image/svg+xml")
 
 
 @login_required

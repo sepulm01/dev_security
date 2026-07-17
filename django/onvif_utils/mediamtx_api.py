@@ -140,6 +140,20 @@ class MediaMTXAPI:
             )
         return uri
 
+    def ensure_raw_paths(self, device_id, profile_token, rtsp_uri):
+        """Create a raw RTSP proxy path in MediaMTX.
+
+        MediaMTX pulls the RTSP stream from the camera and serves it at
+        rtsp://mediamtx:8554/cam_{id}_{token}. DeepStream consumes this
+        stable local path instead of the unreliable camera directly.
+        """
+        path_name = f"cam_{device_id}_{profile_token}"
+        encoded_source = self._encode_rtsp_url(rtsp_uri)
+        try:
+            self.add_path(path_name, source=encoded_source)
+        except requests.RequestException as e:
+            print(f"Error adding raw path {path_name}: {e}")
+
     def ensure_camera_streams(self, device_id, profiles, stream_uris):
         """Create a single transcoded ``_hw`` path per device for WebRTC.
 
@@ -157,7 +171,7 @@ class MediaMTXAPI:
 
         for p in all_paths:
             name = p["name"]
-            if name.startswith(prefix) and name not in requested_hw:
+            if name.startswith(prefix) and name not in requested_hw and name.endswith("_hw"):
                 try:
                     self.delete_path(name)
                     existing.discard(name)

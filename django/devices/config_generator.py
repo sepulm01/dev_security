@@ -4,29 +4,29 @@ NVDSANALYTICS_CONFIG_FILE = "config_nvdsanalytics.txt"
 FRAME_WIDTH = 1280
 FRAME_HEIGHT = 720
 
-MAX_INSTANCES = 4
+MAX_INSTANCES = 1
 
 PIPELINE_CONFIGS = {
     "main": {
         "models_dir": "../models/peoplenet",
-        "max_streammux_batch": 3,
-        "max_devices_per_instance": 3,
+        "max_batch": 64,
+        "max_devices_per_instance": 64,
         "filename_template": "",
     },
     "retinaface": {
         "models_dir": "../models/retinaface_det10g",
-        "max_streammux_batch": 1,
+        "max_batch": 1,
         "max_devices_per_instance": 1,
         "extra_yaml": "face-class-id: 0\n",
     },
     "yolov9": {
         "models_dir": "../models/yolov9",
-        "max_streammux_batch": 3,
+        "max_batch": 3,
         "max_devices_per_instance": 3,
     },
     "trafficcamnet_lpr": {
         "models_dir": "../models/trafficcamnet",
-        "max_streammux_batch": 1,
+        "max_batch": 1,
         "max_devices_per_instance": 1,
         "sgie_sections": (
             "secondary-gie0:\n"
@@ -200,9 +200,38 @@ def generate_nvdsanalytics_config(devices, config_dir, output_filename=None):
         f.write(content)
 
 
-def generate_config(devices, output_path, pipeline_id="main", nvdsanalytics_filename=None):
+def _write_pgie_config(config_dir, models_dir, output_name, batch_size):
+    template_path = os.path.normpath(os.path.join(config_dir, models_dir, "pgie_config.yml"))
+    output_path = os.path.join(config_dir, output_name)
+    with open(template_path) as f:
+        content = f.read()
+    import re
+    content = re.sub(r'batch-size:\s*\d+', f'batch-size: {batch_size}', content)
+    # Fix relative paths that don't start with / or ../
+    for key in ('onnx-file', 'labelfile-path', 'int8-calib-file'):
+        content = re.sub(
+            rf'({key}:\s*)(?!/|\.\./)(\S+)',
+            rf'\1{models_dir}/\2',
+            content,
+        )
+    with open(output_path, "w") as f:
+        f.write(content)
+
+
+def _ensure_tcp(uri):
+    if not uri or uri.startswith("file://"):
+        return uri
+    if "rtsp_transport" in uri:
+        return uri
+    sep = "&" if "?" in uri else "?"
+    return uri + sep + "rtsp_transport=tcp"
+
+
+def generate_config(devices, output_path, pipeline_id="main", nvdsanalytics_filename=None, batch_size=1, pgie_config_name=None):
     if nvdsanalytics_filename is None:
         nvdsanalytics_filename = NVDSANALYTICS_CONFIG_FILE
+    if pgie_config_name is None:
+        pgie_config_name = f"pgie_config_{pipeline_id}.yml"
     uris = []
     for device in devices:
         if not device.stream_uris:
@@ -217,14 +246,15 @@ def generate_config(devices, output_path, pipeline_id="main", nvdsanalytics_file
         if device.source_type == "file":
             token = device.default_profile_token
             uri = f"rtsp://mediamtx:8554/cam_{device.id}_{token}"
+        else:
+            uri = device.stream_uris.get(device.default_profile_token, "")
         uris.append(uri)
 
     source_list = ";".join(uris) + ";" if uris else ""
-    raw_batch_size = len(uris) or 1
+
+    effective_batch = min(batch_size, len(uris)) if uris else 1
 
     pipeline_cfg = PIPELINE_CONFIGS[pipeline_id]
-    max_batch = pipeline_cfg.get("max_streammux_batch", raw_batch_size)
-    batch_size = min(raw_batch_size, max_batch)
 
     models_dir = pipeline_cfg.get("models_dir", "../models/peoplenet")
     sgie_sections = pipeline_cfg.get("sgie_sections", "")
@@ -239,7 +269,7 @@ def generate_config(devices, output_path, pipeline_id="main", nvdsanalytics_file
   list: "{source_list}"
 
 streammux:
-  batch-size: {batch_size}
+  batch-size: {effective_batch}
   batched-push-timeout: 40000
   width: 1920
   height: 1080
@@ -248,7 +278,7 @@ labels: {labels}
 
 primary-gie:
   plugin-type: 0
-  config-file-path: {models_dir}/pgie_config.yml
+  config-file-path: ./{pgie_config_name}
 
 {sgie_sections}analytics:
   enable: 1
@@ -300,29 +330,20 @@ def generate_all_configs(config_dir=None):
         )
 
         pipeline_cfg = PIPELINE_CONFIGS[pipeline_id]
-        max_per_instance = pipeline_cfg["max_devices_per_instance"]
-        instances_needed = min(
-            max((len(pipeline_devices) + max_per_instance - 1) // max_per_instance, 1),
-            MAX_INSTANCES,
-        )
+        filename = get_pipeline_filename(pipeline_id, instance=1)
+        output_path = os.path.join(config_dir, filename)
 
-        for n in range(1, MAX_INSTANCES + 1):
-            filename = get_pipeline_filename(pipeline_id, instance=n)
-            output_path = os.path.join(config_dir, filename)
+        if pipeline_devices:
+            batch = min(len(pipeline_devices), pipeline_cfg.get("max_batch", 1))
+            pgie_name = f"pgie_config_{pipeline_id}.yml"
+            _write_pgie_config(config_dir, pipeline_cfg["models_dir"],
+                               pgie_name, batch)
+            generate_config(pipeline_devices, output_path, pipeline_id,
+                            batch_size=batch, pgie_config_name=pgie_name)
+            generate_nvdsanalytics_config(pipeline_devices, config_dir)
+        else:
+            write_empty_config(output_path, pipeline_id)
 
-            if n <= instances_needed and pipeline_devices:
-                my_devices = pipeline_devices[(n - 1) :: instances_needed]
-                nv_filename = (
-                    f"{NVDSANALYTICS_CONFIG_FILE.replace('.txt', '')}_{n}.txt"
-                    if n > 1
-                    else NVDSANALYTICS_CONFIG_FILE
-                )
-                generate_config(my_devices, output_path, pipeline_id,
-                                nvdsanalytics_filename=nv_filename)
-                generate_nvdsanalytics_config(my_devices, config_dir,
-                                              output_filename=nv_filename)
-            else:
-                write_empty_config(output_path, pipeline_id)
 
 
 def write_empty_config(output_path, pipeline_id):

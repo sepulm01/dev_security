@@ -161,6 +161,16 @@ class NotificationBridge:
             if obj_count < rule.min_objects:
                 return False
 
+        if rule.min_confidence > 0:
+            objects = event_data.get("data", {}).get("Object", [])
+            if objects:
+                passed = any(
+                    obj.get("confidence", 0) >= rule.min_confidence
+                    for obj in objects
+                )
+                if not passed:
+                    return False
+
         return True
 
     def _check_cooldown(self, rule, device_id):

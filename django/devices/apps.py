@@ -1,3 +1,4 @@
+import os
 import threading
 import time
 
@@ -86,12 +87,20 @@ class DevicesConfig(AppConfig):
                                 [device.default_profile_token],
                                 [default_uri],
                             )
+                            mtx.ensure_raw_paths(
+                                device.id,
+                                device.default_profile_token,
+                                default_uri,
+                            )
                 except Exception:
                     pass
 
             print("[Startup] ONVIF refreshed, MediaMTX synced")
-            regenerate_config_and_restart()
-            print("[Startup] Config generated and DS restart triggered")
+            if os.environ.get("RUN_STARTUP_SYNC", "").lower() in ("1", "true"):
+                regenerate_config_and_restart()
+                print("[Startup] Config generated and DS restart triggered")
+            else:
+                print("[Startup] Skipping DS restart (RUN_STARTUP_SYNC not set)")
 
         thread = threading.Thread(target=check_and_sync, daemon=True)
         thread.start()

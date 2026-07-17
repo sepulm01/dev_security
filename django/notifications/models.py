@@ -32,6 +32,7 @@ class NotificationRule(models.Model):
     event_codes = models.JSONField(blank=True, default=list)
     analytics_trigger = models.JSONField(blank=True, default=list)
     min_objects = models.IntegerField(default=0)
+    min_confidence = models.FloatField(default=0.25, help_text="Confianza minima de deteccion (0.0-1.0)")
     cooldown_seconds = models.IntegerField(default=0)
     min_duration_seconds = models.IntegerField(default=0)
     is_active = models.BooleanField(default=True)

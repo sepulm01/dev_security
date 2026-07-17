@@ -16,6 +16,11 @@
             </div>
             <div class="card-body">
                 <dl class="dl-row mb-0">
+                    <dt>Nombre</dt>
+                    <dd>
+                        <input type="text" class="form-control form-control-sm" id="deviceName"
+                            value="{{ device.name }}" style="max-width:280px">
+                    </dd>
                     <dt>Host</dt>
                     <dd>{{ device.host }}:{{ device.port }}</dd>
                     <dt>Fabricante</dt>
@@ -593,6 +598,15 @@ function saveGps() {
 
 document.getElementById('gpsLat').addEventListener('change', saveGps);
 document.getElementById('gpsLon').addEventListener('change', saveGps);
+
+function saveName() {
+    fetch('/api/devices/' + DEVICE_ID + '/update-name/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name: document.getElementById('deviceName').value}),
+    });
+}
+document.getElementById('deviceName').addEventListener('change', saveName);
 
 renderCapabilities();
 loadProfiles();
