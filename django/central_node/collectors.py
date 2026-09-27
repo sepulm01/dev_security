@@ -71,8 +71,12 @@ def collect_metrics():
 
 
 def get_version():
+    import os
     import subprocess
 
+    env_version = os.environ.get("NODE_VERSION", "")
+    if env_version:
+        return env_version
     try:
         return subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], text=True).strip()
     except Exception:

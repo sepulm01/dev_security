@@ -1,5 +1,8 @@
 FROM python:3.12-slim
 
+ARG GIT_COMMIT=unknown
+ENV NODE_VERSION=$GIT_COMMIT
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \

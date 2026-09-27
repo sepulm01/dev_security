@@ -91,3 +91,13 @@ docker compose logs -f django-http
 | event-stream-service | Dahua event HTTP streaming | — |
 | postgres | Database (pgvector) | 5432 |
 | redis | Cache/broker/channel layer | 6379 |
+
+## Instancia central (VPS) — stsecurity.streetflow.cl
+
+- Desplegada en el VPS (172.235.155.156) con `docker-compose.central.yml` (proyecto `mediamtx-central`, repo en `/opt/dev_security`).
+- Servicios: postgres (pgvector), redis, django-http (gunicorn→127.0.0.1:8280), django-asgi (daphne→8281), celery-beat, celery-worker. `CENTRAL_MODE=1` desactiva la sincronización ONVIF de arranque y habilita `central.tasks.central_check`.
+- Apps: `central` (Node/NodeMetric/NodeCommand/NodeAlert, API `/central/api/v1/...` con HMAC por nodo, dashboard `/central/`) y `central_node` (agente `manage.py node_agent`, contenedor `node-agent` en cada nodo).
+- Registrar un nodo en el VPS: `docker compose -f docker-compose.central.yml exec django-http python manage.py register_node <slug> --name <nombre> --wg-ip <ip>` → imprime TOKEN (una sola vez).
+- En cada nodo LAN: contenedor `node-agent` con env `CENTRAL_API_URL=https://stsecurity.streetflow.cl/central`, `NODE_SLUG`, `NODE_TOKEN`; comandos remotos soportados: `get_state`, `sync_config`, `sync_mediamtx`, `restart_pipeline`.
+- Rebuild con versión: `GIT_COMMIT=$(git rev-parse --short HEAD) docker compose -f docker-compose.central.yml build` (arg GIT_COMMIT → env NODE_VERSION).
+- WireGuard hub-and-spoke existente: VPS `10.10.20.2/24`, nodos `10.10.20.1`, `.4`, `.5`.
