@@ -29,7 +29,15 @@ def derive_status(metrics_summary: dict, devices: list) -> str:
             reasons.append(f"GPU {g.get('name', '')} al {mem:.0f}%")
 
     partitions = system.get("disk", {}).get("partitions") or []
+    EXCLUDED_ROOTS = {"proc", "sys", "dev", "run", "etc", "snap", "boot", "tmp", "mnt", "media"}
     for part in partitions:
+        mountpoint = part.get("mountpoint", "")
+        if mountpoint != "/":
+            if mountpoint.count("/") != 1:
+                continue
+            root = mountpoint.strip("/")
+            if root in EXCLUDED_ROOTS:
+                continue
         percent = part.get("percent")
         if isinstance(percent, (int, float)) and percent > DISK_THRESHOLD:
             reasons.append(f"disco {part.get('mountpoint', '')} al {percent:.0f}%")
