@@ -47,7 +47,8 @@ def derive_status(metrics_summary: dict, devices: list) -> str:
     for pipeline, value in fps.items():
         if isinstance(value, dict):
             total = value.get("total_fps")
-            if total is not None and total <= 0:
+            source_count = value.get("source_count", 0)
+            if source_count and (total is None or total <= 0):
                 reasons.append(f"pipeline {pipeline} sin FPS")
 
     if reasons:
