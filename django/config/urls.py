@@ -12,4 +12,5 @@ urlpatterns = [
     path("", include("operadores.urls")),
     path("", include("detections.urls")),
     path("monitoring/", include("monitoring.urls")),
+    path("central/", include("central.urls")),
 ]

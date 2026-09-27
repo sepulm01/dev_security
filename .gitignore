@@ -67,3 +67,5 @@ computer_vision/app/pipeline-test3
 computer_vision/config/config*.yml
 computer_vision/config/config_nvdsanalytics*.txt
 computer_vision/config/pgie_config_*.yml
+# Central node env
+.env.central

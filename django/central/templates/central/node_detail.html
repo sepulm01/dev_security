@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="es" data-bs-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Central · {{ node.name }}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0/dist/css/tabler.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
+    <style>
+        body { background: #111827; }
+        .badge-status-online { background: #16a34a; }
+        .badge-status-degraded { background: #d97706; }
+        .badge-status-offline { background: #dc2626; }
+    </style>
+</head>
+<body>
+<div class="page">
+    <div class="page-header">
+        <div class="container-xl">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="page-title">{{ node.name }}</h1>
+                    <div class="text-muted"><code>{{ node.slug }}</code> · <span class="badge badge-status-{{ node.status }}">{{ node.get_status_display }}</span> · último contacto {{ node.last_seen|timesince|default:"—" }}</div>
+                </div>
+                <a href="{% url 'central_dashboard' %}" class="btn btn-outline-secondary">← Nodos</a>
+            </div>
+        </div>
+    </div>
+    <div class="page-body">
+        <div class="container-xl">
+            <div class="row row-cards">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">CPU / RAM</div>
+                        <div class="card-body"><canvas id="chartCpuRam" height="120"></canvas></div>
+                    </div>
+                </div>
+                <div class="col-12 col-lg-6">
+                    <div class="card">
+                        <div class="card-header">GPU</div>
+                        <div class="card-body"><canvas id="chartGpu" height="120"></canvas></div>
+                    </div>
+                </div>
+                <div class="col-12 col-lg-6">
+                    <div class="card">
+                        <div class="card-header">FPS DeepStream</div>
+                        <div class="card-body"><canvas id="chartFps" height="120"></canvas></div>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">Cámaras reportadas</div>
+                        <div class="table-responsive">
+                            <table class="table table-vcenter">
+                                <thead><tr><th>ID</th><th>Nombre</th><th>Online</th><th>FPS bajo</th></tr></thead>
+                                <tbody>
+                                    {% for device in node.devices_data.devices %}
+                                    <tr>
+                                        <td>{{ device.id }}</td>
+                                        <td>{{ device.name }}</td>
+                                        <td>{% if device.is_online %}<span class="badge bg-green">sí</span>{% else %}<span class="badge bg-red">no</span>{% endif %}</td>
+                                        <td>{% if device.fps_low %}<span class="badge bg-orange">sí</span>{% else %}<span class="badge bg-secondary">no</span>{% endif %}</td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr><td colspan="4" class="text-muted">Sin datos.</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-lg-6">
+                    <div class="card">
+                        <div class="card-header">Enviar comando</div>
+                        <div class="card-body">
+                            <form method="post" action="{% url 'central_command_create' node.slug %}" class="row g-2">
+                                {% csrf_token %}
+                                <div class="col-auto">
+                                    <select name="kind" class="form-select">
+                                        <option value="get_state">get_state</option>
+                                        <option value="sync_config">sync_config</option>
+                                        <option value="sync_mediamtx">sync_mediamtx</option>
+                                        <option value="restart_pipeline">restart_pipeline</option>
+                                    </select>
+                                </div>
+                                <div class="col-auto"><input type="text" name="pipeline" class="form-control" placeholder="pipeline (solo restart)"></div>
+                                <div class="col-auto"><button class="btn btn-primary">Encolar</button></div>
+                            </form>
+                            <div class="text-muted small mt-2">El nodo ejecuta al siguiente poll (≈10s).</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-lg-6">
+                    <div class="card">
+                        <div class="card-header">Comandos</div>
+                        <div class="list-group list-group-flush">
+                            {% for command in commands %}
+                            <div class="list-group-item d-flex justify-content-between">
+                                <div><code>{{ command.kind }}</code> <span class="text-muted small">{{ command.created_at|timesince }}</span></div>
+                                <span class="badge {% if command.status == 'ok' %}bg-green{% elif command.status == 'error' %}bg-red{% elif command.status == 'sent' %}bg-azure{% else %}bg-secondary{% endif %}">{{ command.get_status_display }}</span>
+                            </div>
+                            {% empty %}
+                            <div class="list-group-item text-muted">Sin comandos.</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+const systemRows = {{ sources.system|safe|default:"[]" }};
+const dsRows = {{ sources.deepstream|safe|default:"[]" }};
+const labels = systemRows.map(r => new Date(r.ts).toLocaleTimeString('es-CL', {hour:'2-digit', minute:'2-digit', second:'2-digit'}));
+new Chart(document.getElementById('chartCpuRam'), {
+    type: 'line',
+    data: {
+        labels,
+        datasets: [
+            { label: 'CPU %', data: systemRows.map(r => r.data.cpu?.percent), borderColor: '#00c4cc', tension: 0.3 },
+            { label: 'RAM %', data: systemRows.map(r => r.data.memory?.percent), borderColor: '#f59e0b', tension: 0.3 },
+        ]
+    },
+    options: { responsive: true, plugins: { legend: { display: true } } }
+});
+new Chart(document.getElementById('chartGpu'), {
+    type: 'line',
+    data: {
+        labels,
+        datasets: [
+            { label: 'GPU util %', data: systemRows.map(r => r.data.gpu?.gpus?.[0]?.gpu_utilization_pct), borderColor: '#8b5cf6', tension: 0.3 },
+            { label: 'VRAM %', data: systemRows.map(r => r.data.gpu?.gpus?.[0]?.memory_utilization_pct), borderColor: '#ef4444', tension: 0.3 },
+        ]
+    },
+    options: { responsive: true }
+});
+const fpsSeries = {};
+dsRows.forEach(r => {
+    Object.entries(r.data.fps || {}).forEach(([pipe, info]) => {
+        (fpsSeries[pipe] = fpsSeries[pipe] || []).push({x: new Date(r.ts).toLocaleTimeString('es-CL', {hour:'2-digit',minute:'2-digit',second:'2-digit'}), y: info.total_fps ?? info});
+    });
+});
+const fpsDatasets = Object.entries(fpsSeries).map(([pipe, points]) => ({
+    label: pipe,
+    data: points,
+    tension: 0.3,
+}));
+new Chart(document.getElementById('chartFps'), {
+    type: 'line',
+    data: { datasets: fpsDatasets },
+    options: { responsive: true }
+});
+</script>
+</body>
+</html>

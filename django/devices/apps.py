@@ -12,6 +12,9 @@ class DevicesConfig(AppConfig):
     def ready(self):
         import devices.signals  # noqa: F401
 
+        if os.environ.get("CENTRAL_MODE", "") == "1":
+            return
+
         def check_and_sync():
             from devices.models import Device
             from devices.utils import regenerate_config_and_restart

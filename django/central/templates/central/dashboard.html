@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="es" data-bs-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Central · Nodos</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0/dist/css/tabler.min.css">
+    <style>
+        body { background: #111827; }
+        .badge-status-online { background: #16a34a; }
+        .badge-status-degraded { background: #d97706; }
+        .badge-status-offline { background: #dc2626; }
+    </style>
+</head>
+<body>
+<div class="page">
+    <div class="page-header">
+        <div class="container-xl">
+            <h1 class="page-title">Central · Nodos</h1>
+            <div class="text-muted">{{ nodes|length }} nodo(s) registrados</div>
+        </div>
+    </div>
+    <div class="page-body">
+        <div class="container-xl">
+            {% if alerts %}
+            <div class="card mb-3">
+                <div class="card-header"><i class="ti ti-alert-triangle me-1"></i>Alertas activas</div>
+                <div class="list-group list-group-flush">
+                    {% for alert in alerts %}
+                    <div class="list-group-item d-flex justify-content-between">
+                        <div><strong>{{ alert.node.name }}</strong> — {{ alert.message }}</div>
+                        <div class="text-muted small">{{ alert.created_at|timesince }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            <div class="row row-cards">
+                {% for node in nodes %}
+                <div class="col-sm-6 col-lg-4">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h3 class="card-title mb-0"><a href="{% url 'central_node_detail' node.slug %}" class="text-reset">{{ node.name }}</a></h3>
+                                <span class="badge badge-status-{{ node.status }}">{{ node.get_status_display }}</span>
+                            </div>
+                            <div class="text-muted small mb-2">slug: <code>{{ node.slug }}</code>{% if node.wg_ip %} · WG {{ node.wg_ip }}{% endif %}</div>
+                            <div class="small">
+                                <div>Último contacto: {% if node.last_seen %}{{ node.last_seen|timesince }}{% else %}—{% endif %}</div>
+                                <div>Versión: {{ node.version|default:"—" }}</div>
+                                <div>Cámaras: {{ node.devices_data.devices|length }} reportadas</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="col-12"><div class="card"><div class="card-body text-muted">Sin nodos registrados. Crea uno con el management command <code>register_node</code>.</div></div></div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

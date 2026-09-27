@@ -3,9 +3,9 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = "django-insecure-&p8e%y1o3u%8y7+h%003^v!4l)rw@qai-u3^acdzy)(q8)27i*"
-DEBUG = True
-ALLOWED_HOSTS = ["*"]
+SECRET_KEY = os.environ.get("SECRET_KEY", "django-insecure-&p8e%y1o3u%8y7+h%003^v!4l)rw@qai-u3^acdzy)(q8)27i*")
+DEBUG = os.environ.get("DEBUG", "True") == "True"
+ALLOWED_HOSTS = [host for host in os.environ.get("ALLOWED_HOSTS", "*").split(",") if host]
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -25,6 +25,8 @@ INSTALLED_APPS = [
     "incidents.apps.IncidentsConfig",
     "operadores.apps.OperadoresConfig",
     "monitoring.apps.MonitoringConfig",
+    "central.apps.CentralConfig",
+    "central_node.apps.CentralNodeConfig",
 ]
 
 MIDDLEWARE = [
@@ -114,6 +116,12 @@ CELERY_BEAT_SCHEDULE = {
         "schedule": 10.0,
     },
 }
+
+if os.environ.get("CENTRAL_MODE", "") == "1":
+    CELERY_BEAT_SCHEDULE["central-check-every-30s"] = {
+        "task": "central.tasks.central_check",
+        "schedule": 30.0,
+    }
 
 AUTH_PASSWORD_VALIDATORS = []
 

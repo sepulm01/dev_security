@@ -1,0 +1,110 @@
+name: mediamtx-central
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mediamtx_central}
+      POSTGRES_USER: ${POSTGRES_USER:-mediamtx}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD requerido}
+    volumes:
+      - central_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mediamtx} -d ${POSTGRES_DB:-mediamtx_central}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - central_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  django-http:
+    build: ./django
+    restart: unless-stopped
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3
+    env_file: .env.central
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=${POSTGRES_DB:-mediamtx_central}
+      - POSTGRES_USER=${POSTGRES_USER:-mediamtx}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - REDIS_URL=redis://redis:6379/0
+      - CENTRAL_MODE=1
+      - DEBUG=${DEBUG:-False}
+    ports:
+      - "127.0.0.1:8080:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  django-asgi:
+    build: ./django
+    restart: unless-stopped
+    command: daphne -b 0.0.0.0 -p 8001 config.asgi:application
+    env_file: .env.central
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=${POSTGRES_DB:-mediamtx_central}
+      - POSTGRES_USER=${POSTGRES_USER:-mediamtx}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - REDIS_URL=redis://redis:6379/0
+      - CENTRAL_MODE=1
+      - DEBUG=${DEBUG:-False}
+    ports:
+      - "127.0.0.1:8001:8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  celery-worker:
+    build: ./django
+    restart: unless-stopped
+    command: celery -A config worker -l info
+    env_file: .env.central
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=${POSTGRES_DB:-mediamtx_central}
+      - POSTGRES_USER=${POSTGRES_USER:-mediamtx}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - REDIS_URL=redis://redis:6379/0
+      - CENTRAL_MODE=1
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  celery-beat:
+    build: ./django
+    restart: unless-stopped
+    command: celery -A config beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    env_file: .env.central
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=${POSTGRES_DB:-mediamtx_central}
+      - POSTGRES_USER=${POSTGRES_USER:-mediamtx}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - REDIS_URL=redis://redis:6379/0
+      - CENTRAL_MODE=1
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  central_postgres_data:
+  central_redis_data:
